@@ -14,6 +14,7 @@ import os
 import random
 import sys
 import time
+import logging
 from pyrogram import Client, filters, __version__
 from pyrogram.enums import ParseMode, ChatAction, ChatMemberStatus, ChatType
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, ReplyKeyboardMarkup, ChatMemberUpdated, ChatPermissions
@@ -22,6 +23,10 @@ from bot import Bot
 from config import *
 from helper_func import *
 from database.database import *
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Request force sub mode command
 @Bot.on_message(filters.command('fsub_mode') & filters.private & admin)
@@ -113,7 +118,7 @@ async def add_force_sub(client: Client, message: Message):
             return await temp.edit("<b>❌ Only public or private channels are allowed.</b>")
 
         member = await client.get_chat_member(chat.id, "me")
-        print(f"Bot status: {member.status} in chat: {chat.title} ({chat.id})")  # Debug
+        logger.info(f"Bot status: {member.status} in chat: {chat.title} ({chat.id})")  # Debug
 
         # FIXED ENUM COMPARISON
         if member.status not in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
@@ -154,11 +159,13 @@ async def del_force_sub(client: Client, message: Message):
                 return await temp.edit("<b>❌ No force-sub channels found.</b>")
             for ch_id in all_channels:
                 await db.rem_channel(ch_id)
+                logger.info(f"Removed force-sub channel: {ch_id}")
             return await temp.edit("<b>✅ All force-sub channels have been removed.</b>")
 
         ch_id = int(args[1])
         if ch_id in all_channels:
             await db.rem_channel(ch_id)
+            logger.info(f"Removed force-sub channel: {ch_id}")
             return await temp.edit(f"<b>✅ Channel removed:</b> <code>{ch_id}</code>")
         else:
             return await temp.edit(f"<b>❌ Channel not found in force-sub list:</b> <code>{ch_id}</code>")
@@ -166,10 +173,13 @@ async def del_force_sub(client: Client, message: Message):
     except ValueError:
         return await temp.edit("<b>❌ Invalid Channel ID. Use a numeric ID or 'all'.</b>")
     except Exception as e:
+        logger.error(f"Failed to remove channel: {e}")
+        error_msg = str(e).replace('<', '&lt;').replace('>', '&gt;')
         return await temp.edit(
             f"<b>❌ Failed to remove channel:</b>\n"
-            f"<blockquote>{e}</blockquote>\n"
-            f"Please contact support @CodeflixSupport."
+            f"<i>{error_msg}</i>\n"
+            f"Please contact support @Clutch008.",
+            parse_mode=ParseMode.HTML
         )
 
 # View all channels
