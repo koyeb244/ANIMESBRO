@@ -1,3 +1,13 @@
+# Don't Remove Credit @CodeFlix_Bots, @clutch008
+# Ask Doubt on telegram @CodeflixSupport
+#
+# Copyright (C) 2025 by Codeflix-Bots@Github, < https://github.com/Codeflix-Bots >.
+#
+# This file is part of < https://github.com/Codeflix-Bots/FileStore > project,
+# and is released under the MIT License.
+# Please see < https://github.com/Codeflix-Bots/FileStore/blob/master/LICENSE >
+#
+# All rights reserved.
 
 import asyncio
 import os
@@ -13,9 +23,7 @@ from config import *
 from helper_func import *
 from database.database import *
 
-
-
-#Request force sub mode commad,,,,,,
+# Request force sub mode command
 @Bot.on_message(filters.command('fsub_mode') & filters.private & admin)
 async def change_force_sub_mode(client: Client, message: Message):
     temp = await message.reply("<b><i>ᴡᴀɪᴛ ᴀ sᴇᴄ..</i></b>", quote=True)
@@ -60,7 +68,6 @@ async def handle_Chatmembers(client, chat_member_updated: ChatMemberUpdated):
             if await db.req_user_exist(chat_id, user_id):
                 await db.del_req_user(chat_id, user_id)
 
-
 # This handler will capture any join request to the channel/group where the bot is an admin
 @Bot.on_chat_join_request()
 async def handle_join_request(client, chat_join_request):
@@ -77,8 +84,6 @@ async def handle_join_request(client, chat_join_request):
         if not await db.req_user_exist(chat_id, user_id):
             await db.req_user(chat_id, user_id)
             #print(f"Added user {user_id} to request list for {chat_id}")
-
-
 
 # Add channel
 @Bot.on_message(filters.command('addchnl') & filters.private & admin)
@@ -98,8 +103,7 @@ async def add_force_sub(client: Client, message: Message):
         return await temp.edit("<b>❌ Invalid Channel ID!</b>")
 
     all_channels = await db.show_channels()
-    channel_ids_only = [cid if isinstance(cid, int) else cid[0] for cid in all_channels]
-    if channel_id in channel_ids_only:
+    if channel_id in all_channels:
         return await temp.edit(f"<b>Channel already exists:</b> <code>{channel_id}</code>")
 
     try:
@@ -134,9 +138,6 @@ async def add_force_sub(client: Client, message: Message):
             f"<b>❌ Failed to add channel:</b>\n<code>{channel_id}</code>\n\n<i>{e}</i>"
         )
 
-
-
-
 # Delete channel
 @Bot.on_message(filters.command('delchnl') & filters.private & admin)
 async def del_force_sub(client: Client, message: Message):
@@ -144,26 +145,32 @@ async def del_force_sub(client: Client, message: Message):
     args = message.text.split(maxsplit=1)
     all_channels = await db.show_channels()
 
-    if len(args) != 2:
-        return await temp.edit("<b>Usage:</b> <code>/delchnl <channel_id | all></code>")
-
-    if args[1].lower() == "all":
-        if not all_channels:
-            return await temp.edit("<b>❌ No force-sub channels found.</b>")
-        for ch_id in all_channels:
-            await db.del_channel(ch_id)
-        return await temp.edit("<b>✅ All force-sub channels have been removed.</b>")
-
     try:
-        ch_id = int(args[1])
-    except ValueError:
-        return await temp.edit("<b>❌ Invalid Channel ID</b>")
+        if len(args) != 2:
+            return await temp.edit("<b>Usage:</b> <code>/delchnl <channel_id | all></code>")
 
-    if ch_id in all_channels:
-        await db.rem_channel(ch_id)
-        return await temp.edit(f"<b>✅ Channel removed:</b> <code>{ch_id}</code>")
-    else:
-        return await temp.edit(f"<b>❌ Channel not found in force-sub list:</b> <code>{ch_id}</code>")
+        if args[1].lower() == "all":
+            if not all_channels:
+                return await temp.edit("<b>❌ No force-sub channels found.</b>")
+            for ch_id in all_channels:
+                await db.rem_channel(ch_id)
+            return await temp.edit("<b>✅ All force-sub channels have been removed.</b>")
+
+        ch_id = int(args[1])
+        if ch_id in all_channels:
+            await db.rem_channel(ch_id)
+            return await temp.edit(f"<b>✅ Channel removed:</b> <code>{ch_id}</code>")
+        else:
+            return await temp.edit(f"<b>❌ Channel not found in force-sub list:</b> <code>{ch_id}</code>")
+
+    except ValueError:
+        return await temp.edit("<b>❌ Invalid Channel ID. Use a numeric ID or 'all'.</b>")
+    except Exception as e:
+        return await temp.edit(
+            f"<b>❌ Failed to remove channel:</b>\n"
+            f"<blockquote>{e}</blockquote>\n"
+            f"Please contact support @CodeflixSupport."
+        )
 
 # View all channels
 @Bot.on_message(filters.command('listchnl') & filters.private & admin)
@@ -184,5 +191,3 @@ async def list_force_sub_channels(client: Client, message: Message):
             result += f"<b>•</b> <code>{ch_id}</code> — <i>Unavailable</i>\n"
 
     await temp.edit(result, disable_web_page_preview=True, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close ✖️", callback_data="close")]]))
-
-
