@@ -15,6 +15,7 @@ import random
 import sys
 import time
 import logging
+import re
 from pyrogram import Client, filters, __version__
 from pyrogram.enums import ParseMode, ChatAction, ChatMemberStatus, ChatType
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, ReplyKeyboardMarkup, ChatMemberUpdated, ChatPermissions
@@ -27,6 +28,19 @@ from database.database import *
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Function to sanitize error messages for Telegram HTML
+def sanitize_error_message(error: str) -> str:
+    # Convert to string and remove problematic characters
+    error = str(error)
+    # Replace HTML special characters
+    error = error.replace('<', '&lt;').replace('>', '&gt;').replace('&', '&amp;')
+    # Remove square brackets, quotes, and other problematic characters
+    error = re.sub(r'[\[\]"\']', '', error)
+    # Replace newlines and multiple spaces with a single space
+    error = re.sub(r'\s+', ' ', error).strip()
+    # Limit length to avoid Telegram message limits
+    return error[:1000]
 
 # Request force sub mode command
 @Bot.on_message(filters.command('fsub_mode') & filters.private & admin)
@@ -140,7 +154,7 @@ async def add_force_sub(client: Client, message: Message):
 
     except Exception as e:
         return await temp.edit(
-            f"<b>❌ Failed to add channel:</b>\n<code>{channel_id}</code>\n\n<i>{e}</i>"
+            f"<b>❌ Failed to add channel:</b>\n<code>{channel_id}</code>\n\n<i>{sanitize_error_message(e)}</i>"
         )
 
 # Delete channel
@@ -160,13 +174,23 @@ async def del_force_sub(client: Client, message: Message):
             for ch_id in all_channels:
                 await db.rem_channel(ch_id)
                 logger.info(f"Removed force-sub channel: {ch_id}")
-            return await temp.edit("<b>✅ All force-sub channels have been removed.</b>")
+            # Verify removal
+            if not await db.show_channels():
+                return await temp.edit("<b>✅ All force-sub channels have been removed.</b>")
+            else:
+                logger.warning("Some channels were not removed")
+                return await temp.edit("<b>⚠️ Some channels could not be removed. Check logs or contact @Clutch008.</b>")
 
         ch_id = int(args[1])
         if ch_id in all_channels:
             await db.rem_channel(ch_id)
             logger.info(f"Removed force-sub channel: {ch_id}")
-            return await temp.edit(f"<b>✅ Channel removed:</b> <code>{ch_id}</code>")
+            # Verify removal
+            if ch_id not in await db.show_channels():
+                return await temp.edit(f"<b>✅ Channel removed:</b> <code>{ch_id}</code>")
+            else:
+                logger.warning(f"Channel {ch_id} was not removed")
+                return await temp.edit(f"<b>⚠️ Channel not removed:</b> <code>{ch_id}</code>. Contact @Clutch008.")
         else:
             return await temp.edit(f"<b>❌ Channel not found in force-sub list:</b> <code>{ch_id}</code>")
 
@@ -174,13 +198,21 @@ async def del_force_sub(client: Client, message: Message):
         return await temp.edit("<b>❌ Invalid Channel ID. Use a numeric ID or 'all'.</b>")
     except Exception as e:
         logger.error(f"Failed to remove channel: {e}")
-        error_msg = str(e).replace('<', '&lt;').replace('>', '&gt;')
-        return await temp.edit(
-            f"<b>❌ Failed to remove channel:</b>\n"
-            f"<i>{error_msg}</i>\n"
-            f"Please contact support @Clutch008.",
-            parse_mode=ParseMode.HTML
-        )
+        error_msg = sanitize_error_message(e)
+        try:
+            return await temp.edit(
+                f"<b>❌ Failed to remove channel:</b>\n"
+                f"<i>{error_msg}</i>\n"
+                f"Please contact support @Clutch008.",
+                parse_mode=ParseMode.HTML
+            )
+        except Exception as edit_error:
+            logger.error(f"Failed to edit message: {edit_error}")
+            # Fallback to plain text
+            return await temp.edit(
+                f"Failed to remove channel: {error_msg}\nPlease contact support @Clutch008.",
+                parse_mode=None
+            )
 
 # View all channels
 @Bot.on_message(filters.command('listchnl') & filters.private & admin)
@@ -195,7 +227,7 @@ async def list_force_sub_channels(client: Client, message: Message):
     for ch_id in channels:
         try:
             chat = await client.get_chat(ch_id)
-            link = chat.invite_link or await client.export_chat_invite_link(chat.id)
+            link = chat.invite_link or await client.export_chat_invite_link(ch_id)
             result += f"<b>•</b> <a href='{link}'>{chat.title}</a> [<code>{ch_id}</code>]\n"
         except Exception:
             result += f"<b>•</b> <code>{ch_id}</code> — <i>Unavailable</i>\n"
